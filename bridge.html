@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>AgentToken Bridge</title>
+  <script src="https://cdn.jsdelivr.net/npm/ethers@5.7.2/dist/ethers.umd.min.js"></script>
+
+  <style>
+    body {
+      background: #000;
+      color: #fff;
+      font-family: monospace;
+      padding: 20px;
+    }
+    button, input {
+      background: #111;
+      color: #fff;
+      border: 1px solid #444;
+      padding: 8px;
+      margin: 4px 0;
+    }
+    button:disabled {
+      background: #333;
+      color: #666;
+      cursor: not-allowed;
+    }
+    .box {
+      border: 1px solid #333;
+      padding: 12px;
+      margin-top: 15px;
+    }
+    #logs {
+      height: 220px;
+      overflow-y: auto;
+      border: 1px solid #222;
+      background: #050505;
+      padding: 10px;
+      white-space: pre-wrap;
+    }
+    .label { color: #aaa; }
+    .address { color: #4CAF50; font-size: 12px; word-break: break-all; }
+  </style>
+</head>
+<body>
+
+<h2>AgentToken Bridge</h2>
+
+<button onclick="connect()">Connect Wallet</button>
+
+<div class="box">
+  <div><span class="label">Wallet:</span> <span id="wallet">–</span></div>
+  <div><span class="label">Network:</span> <span id="network">–</span></div>
+  <button onclick="switchToSkale()">Switch to SKALE</button>
+  <button onclick="switchToBase()">Switch to Base</button>
+</div>
+
+<div class="box">
+  <h3>Addresses</h3>
+  <div><span class="label">Owner:</span> <span class="address" id="ownerAddr">–</span></div>
+  <div><span class="label">AgentToken:</span> <span class="address" id="agentTokenAddr">–</span></div>
+  <div><span class="label">USDC:</span> <span class="address" id="usdcAddr">–</span></div>
+</div>
+
+<div class="box">
+  <h3>Balances</h3>
+  <div>AGENT: <span id="agentBal">–</span></div>
+  <div>USDC: <span id="usdcBal">–</span></div>
+  <div>Free Credits: <span id="freeCredits">–</span></div>
+  <button id="claimBtn" onclick="claim()">Claim Free Credits</button>
+</div>
+
+<div class="box">
+  <h3>Exchange</h3>
+  <div>Rate: 1 USDC = 500 AGENT</div>
+  <input id="usdcAmount" placeholder="USDC amount" />
+  <button onclick="bridgeTokens()">Bridge USDC → AGENT</button>
+</div>
+
+<h3>Logs</h3>
+<div id="logs"></div>
+
+<script>
+let provider, signer, address;
+
+const OWNER_ADDRESS = "0x148355AAac6679908684c02555106bB58942F15d";
+const AGENT_TOKEN = "0xEC307d7ae333C32b70889F0Fd61ce6f02Ee31Cf8";
+const USDC_ADDRESS = "0x036CbD53842c5426634e7929541eC2318f3dCF7e";
+const SKALE_CHAIN_ID = 324705682;
+const BASE_CHAIN_ID = 84532;
+
+const AGENT_ABI = [
+  "function balanceOf(address) view returns (uint256)",
+  "function hasUserClaimedFree(address) view returns (bool)",
+  "function claimFreeCredits()",
+  "function claimAgentTokens(uint256) external",
+  "function getUsdcTransferred(address) view returns (uint256)"
+];
+
+const ERC20_ABI = [
+  "function balanceOf(address) view returns (uint256)",
+  "function transfer(address,uint256) returns (bool)"
+];
+
+function log(msg) {
+  const l = document.getElementById("logs");
+  l.textContent += msg + "\n";
+  l.scrollTop = l.scrollHeight;
+}
+
+async function connect() {
+  provider = new ethers.providers.Web3Provider(window.ethereum);
+  await provider.send("eth_requestAccounts", []);
+  signer = provider.getSigner();
+  address = await signer.getAddress();
+  document.getElementById("wallet").textContent = address;
+  
+  document.getElementById("ownerAddr").textContent = OWNER_ADDRESS;
+  document.getElementById("agentTokenAddr").textContent = AGENT_TOKEN;
+  document.getElementById("usdcAddr").textContent = USDC_ADDRESS;
+  
+  await refresh();
+  log("Connected");
+}
+
+async function switchToBase() {
+  await window.ethereum.request({
+    method: "wallet_switchEthereumChain",
+    params: [{ chainId: ethers.utils.hexValue(BASE_CHAIN_ID) }]
+  });
+  provider = new ethers.providers.Web3Provider(window.ethereum);
+  signer = provider.getSigner();
+  log("Switched to Base");
+}
+
+async function switchToSkale() {
+  await window.ethereum.request({
+    method: "wallet_switchEthereumChain",
+    params: [{ chainId: ethers.utils.hexValue(SKALE_CHAIN_ID) }]
+  });
+  provider = new ethers.providers.Web3Provider(window.ethereum);
+  signer = provider.getSigner();
+  log("Switched to SKALE");
+}
+
+async function refresh() {
+  const net = await provider.getNetwork();
+  document.getElementById("network").textContent = `${net.chainId}`;
+
+  if (net.chainId === SKALE_CHAIN_ID) {
+    const agent = new ethers.Contract(AGENT_TOKEN, AGENT_ABI, provider);
+    const bal = await agent.balanceOf(address);
+    document.getElementById("agentBal").textContent = ethers.utils.formatEther(bal);
+
+    const claimed = await agent.hasUserClaimedFree(address);
+    document.getElementById("freeCredits").textContent = claimed ? "Claimed" : "Available";
+    document.getElementById("claimBtn").disabled = claimed;
+    document.getElementById("claimBtn").textContent = claimed ? "Claimed" : "Claim Free Credits";
+  } else {
+    document.getElementById("agentBal").textContent = "Switch to SKALE";
+    document.getElementById("freeCredits").textContent = "Switch to SKALE";
+    document.getElementById("claimBtn").disabled = true;
+    document.getElementById("claimBtn").textContent = "Switch to SKALE";
+  }
+
+  if (net.chainId === BASE_CHAIN_ID) {
+    const usdc = new ethers.Contract(USDC_ADDRESS, ERC20_ABI, provider);
+    const bal = await usdc.balanceOf(address);
+    document.getElementById("usdcBal").textContent = ethers.utils.formatUnits(bal, 6);
+  } else {
+    document.getElementById("usdcBal").textContent = "Switch to Base";
+  }
+}
+
+async function claim() {
+  const agent = new ethers.Contract(AGENT_TOKEN, AGENT_ABI, signer);
+  const tx = await agent.claimFreeCredits();
+  log("Claim tx: " + tx.hash);
+  await tx.wait();
+  log("Free credits claimed!");
+  await refresh();
+}
+
+async function bridgeTokens() {
+  const amount = document.getElementById("usdcAmount").value;
+  if (!amount) {
+    log("Enter USDC amount");
+    return;
+  }
+
+  // Step 1: Transfer USDC to owner on Base
+  const net = await provider.getNetwork();
+  if (net.chainId !== BASE_CHAIN_ID) {
+    log("Switch to Base first");
+    return;
+  }
+
+  log("Step 1: Transferring " + amount + " USDC to owner...");
+  const usdc = new ethers.Contract(USDC_ADDRESS, ERC20_ABI, signer);
+  const parsedAmount = ethers.utils.parseUnits(amount, 6);
+  
+  const usdcTx = await usdc.transfer(OWNER_ADDRESS, parsedAmount);
+  log("USDC tx: " + usdcTx.hash);
+  await usdcTx.wait();
+  log("✓ USDC transferred to owner");
+
+  // Step 2: Switch to SKALE and claim AGENT tokens
+  log("Step 2: Switching to SKALE for AGENT claim...");
+  await switchToSkale();
+  
+  const agent = new ethers.Contract(AGENT_TOKEN, AGENT_ABI, signer);
+  // Pass USDC amount as number (not wei) since contract expects it in USDC units
+  const usdcAmount = parseFloat(amount);
+  
+  const agentTx = await agent.claimAgentTokens(usdcAmount);
+  log("AGENT claim tx: " + agentTx.hash);
+  await agentTx.wait();
+  log("✓ Claimed " + (usdcAmount * 500) + " AGENT tokens");
+  
+  await refresh();
+}
+</script>
+
+</body>
+</html>
