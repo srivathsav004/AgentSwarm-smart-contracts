@@ -24,3 +24,5 @@ node_modules
 .env
 
 deployment.json
+
+.vscode
