@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Agent Swarm - x402 Escrow</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/6.9.0/ethers.umd.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body class="bg-gray-100 min-h-screen p-4">
+    <div class="max-w-6xl mx-auto">
+        
+        <!-- Header -->
+        <div class="section flex justify-between items-center">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 bg-blue-600 rounded-lg flex items-center justify-center">
+                    <i class="fas fa-robot text-white"></i>
+                </div>
+                <div>
+                    <h1 class="text-xl font-bold">Agent Swarm</h1>
+                    <p class="text-xs text-gray-500">x402 Budget-Based Payment</p>
+                </div>
+            </div>
+            <button id="connectBtn" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded text-sm">
+                <i class="fas fa-wallet mr-2"></i>Connect Wallet
+            </button>
+        </div>
+
+        <!-- Main Content -->
+        <div id="infoPanel" class="hidden">
+            
+            <!-- Connection Info -->
+            <div class="section">
+                <h2 class="text-sm font-bold mb-3 flex items-center gap-2">
+                    <i class="fas fa-info-circle text-blue-500"></i> Connection Info
+                </h2>
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
+                    <div>
+                        <p class="label">Your Wallet</p>
+                        <p id="walletAddress" class="value truncate">-</p>
+                    </div>
+                    <div>
+                        <p class="label">AGENT Token</p>
+                        <p class="value truncate">0xEC307...1Cf8</p>
+                    </div>
+                    <div>
+                        <p class="label">Agent Registry</p>
+                        <p class="value truncate">0x5dB66...d6b1</p>
+                    </div>
+                    <div>
+                        <p class="label">Task Escrow</p>
+                        <p class="value truncate">0x29B8d...4E62</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Balances -->
+            <div class="section">
+                <h2 class="text-sm font-bold mb-3 flex items-center gap-2">
+                    <i class="fas fa-coins text-green-500"></i> Balances
+                </h2>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div class="bg-gray-50 rounded p-3">
+                        <p class="label">Wallet Balance</p>
+                        <p id="walletBalance" class="text-lg font-bold text-blue-600">- AGENT</p>
+                        <p id="walletBalanceEth" class="text-xs text-gray-500">- CREDIT</p>
+                    </div>
+                    <div class="bg-gray-50 rounded p-3">
+                        <p class="label">Approved for Escrow</p>
+                        <p id="escrowBalance" class="text-lg font-bold text-purple-600">- AGENT</p>
+                        <button id="refreshEscrowBtn" class="text-xs text-blue-600 mt-1">
+                            <i class="fas fa-sync"></i> Refresh
+                        </button>
+                    </div>
+                    <div class="bg-gray-50 rounded p-3">
+                        <p class="label">Your Available</p>
+                        <p id="totalAvailable" class="text-lg font-bold text-gray-800">- AGENT</p>
+                        <p class="text-xs text-gray-500">Wallet tokens ready for tasks</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Approve Section -->
+            <div class="section">
+                <h2 class="text-sm font-bold mb-3 flex items-center gap-2">
+                    <i class="fas fa-check-circle text-green-500"></i> Approve Tokens for Tasks
+                </h2>
+                <div class="flex gap-2 items-end">
+                    <div class="flex-1">
+                        <p class="label mb-1">Amount (AGENT)</p>
+                        <input id="depositAmount" type="number" placeholder="100" class="w-full border rounded px-3 py-2 text-sm">
+                    </div>
+                    <button id="maxDepositBtn" class="bg-gray-200 hover:bg-gray-300 px-3 py-2 rounded text-sm">Max</button>
+                    <button id="depositBtn" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded text-sm">
+                        <i class="fas fa-check mr-1"></i>Approve
+                    </button>
+                </div>
+                <p class="text-xs text-gray-500 mt-2">
+                    <i class="fas fa-info-circle"></i> 
+                    Approve escrow to spend your tokens. Tokens stay in your wallet until task creation.
+                </p>
+                <div id="depositStatus" class="hidden mt-2 text-sm"></div>
+            </div>
+
+            <!-- Available Agents -->
+            <div class="section">
+                <h2 class="text-sm font-bold mb-3 flex items-center gap-2">
+                    <i class="fas fa-users text-blue-500"></i> Available Agents 
+                    <span id="agentsCount" class="text-xs font-normal text-gray-500">(loading...)</span>
+                </h2>
+                <div id="agentsList" class="space-y-2">
+                    <p class="text-sm text-gray-500">Connect wallet to load agents from blockchain...</p>
+                </div>
+            </div>
+
+            <!-- Task Creation Steps -->
+            <div class="section">
+                <h2 class="text-sm font-bold mb-3 flex items-center gap-2">
+                    <i class="fas fa-tasks text-purple-500"></i> Create Task
+                </h2>
+                
+                <div id="step1" class="step-box step-pending">
+                    <div class="flex items-center justify-between mb-2">
+                        <div class="flex items-center gap-2">
+                            <span class="w-6 h-6 rounded-full bg-gray-300 text-xs flex items-center justify-center font-bold">1</span>
+                            <span class="font-medium">Select Agents</span>
+                        </div>
+                        <span id="step1Status" class="text-xs text-gray-500">Pending</span>
+                    </div>
+                    <div id="selectedAgentsList" class="text-sm text-gray-600">No agents selected</div>
+                </div>
+
+                <div id="step2" class="step-box step-pending">
+                    <div class="flex items-center justify-between mb-2">
+                        <div class="flex items-center gap-2">
+                            <span class="w-6 h-6 rounded-full bg-gray-300 text-xs flex items-center justify-center font-bold">2</span>
+                            <span class="font-medium">Confirm Budget</span>
+                        </div>
+                        <span id="step2Status" class="text-xs text-gray-500">Pending</span>
+                    </div>
+                    <div class="flex justify-between items-center">
+                        <span class="text-sm">Total Required:</span>
+                        <span id="totalBudget" class="font-bold text-lg">0 AGENT</span>
+                    </div>
+                </div>
+
+                <div id="step3" class="step-box step-pending">
+                    <div class="flex items-center justify-between mb-2">
+                        <div class="flex items-center gap-2">
+                            <span class="w-6 h-6 rounded-full bg-gray-300 text-xs flex items-center justify-center font-bold">3</span>
+                            <span class="font-medium">Create Task on Blockchain</span>
+                        </div>
+                        <span id="step3Status" class="text-xs text-gray-500">Waiting...</span>
+                    </div>
+                    <button id="createTaskBtn" class="w-full bg-blue-600 hover:bg-blue-700 text-white py-2 rounded text-sm disabled:opacity-50 disabled:cursor-not-allowed" disabled>
+                        Create Task
+                    </button>
+                    <div id="createTaskTx" class="hidden mt-2 text-xs font-mono"></div>
+                </div>
+
+                <div id="step4" class="step-box step-pending">
+                    <div class="flex items-center justify-between mb-2">
+                        <div class="flex items-center gap-2">
+                            <span class="w-6 h-6 rounded-full bg-gray-300 text-xs flex items-center justify-center font-bold">4</span>
+                            <span class="font-medium">x402 Payment Processing</span>
+                            <span class="text-xs text-orange-500"><i class="fas fa-server"></i> API</span>
+                        </div>
+                        <span id="step4Status" class="text-xs text-gray-500">Waiting...</span>
+                    </div>
+                    <div id="step4Progress" class="hidden">
+                        <div class="w-full bg-gray-200 rounded h-2 mb-2">
+                            <div id="step4Bar" class="bg-blue-600 h-2 rounded transition-all" style="width: 0%"></div>
+                        </div>
+                        <p id="step4Text" class="text-xs">Initializing...</p>
+                    </div>
+                    <div id="step4Agents" class="space-y-1 mt-2"></div>
+                </div>
+            </div>
+
+            <!-- Agent Workflow - Data Passing -->
+            <div class="section">
+                <h2 class="text-sm font-bold mb-3 flex items-center gap-2">
+                    <i class="fas fa-project-diagram text-indigo-500"></i> Agent Workflow
+                </h2>
+                
+                <!-- Initial Input -->
+                <div class="mb-4">
+                    <p class="label mb-1">Initial Input (Coordinator)</p>
+                    <textarea id="workflowInput" rows="2" class="w-full border rounded px-3 py-2 text-sm" placeholder="Enter task description or data for agents to process...">Analyze the current market trends for AI agents and provide a strategic roadmap.</textarea>
+                </div>
+
+                <!-- Workflow Output Display -->
+                <div id="workflowOutput" class="hidden space-y-3">
+                    <div class="border-l-4 border-blue-500 pl-3 py-2 bg-blue-50 rounded">
+                        <p class="text-xs font-bold text-blue-700">Coordinator Input:</p>
+                        <p id="coordinatorOutput" class="text-sm text-gray-700 mt-1"></p>
+                    </div>
+                    <div id="agentOutputs"></div>
+                    <div id="finalOutput" class="hidden border-l-4 border-green-500 pl-3 py-2 bg-green-50 rounded mt-3">
+                        <p class="text-xs font-bold text-green-700"><i class="fas fa-flag-checkered"></i> Final Output:</p>
+                        <p id="finalOutputText" class="text-sm text-gray-700 mt-1 font-medium"></p>
+                    </div>
+                </div>
+
+                <button id="simulateWorkflowBtn" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-2 rounded text-sm mt-2" disabled>
+                    <i class="fas fa-play mr-1"></i> Simulate Agent Workflow
+                </button>
+            </div>
+
+            <!-- Your Tasks -->
+            <div class="section">
+                <h2 class="text-sm font-bold mb-3 flex items-center gap-2">
+                    <i class="fas fa-list text-gray-500"></i> Your Tasks
+                    <button id="refreshTasksBtn" class="text-xs text-blue-600 ml-auto">
+                        <i class="fas fa-sync"></i> Refresh
+                    </button>
+                </h2>
+                <div id="tasksList" class="space-y-2">
+                    <p class="text-sm text-gray-500">No tasks found</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Transaction Logs -->
+        <div class="section bg-gray-900 text-white">
+            <h2 class="text-sm font-bold mb-2 flex items-center gap-2">
+                <i class="fas fa-terminal"></i> Transaction Logs
+            </h2>
+            <div id="logsContainer" class="font-mono text-xs max-h-64 overflow-y-auto space-y-1">
+                <p class="text-gray-500 italic">No transactions yet...</p>
+            </div>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
