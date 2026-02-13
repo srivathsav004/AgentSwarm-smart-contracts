@@ -1,7 +1,15 @@
 import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
-import { allocateBudgetToAgent, completeAgentRequest, completeTask, cancelTask, getServerAddress, createTaskForClient } from './apis/escrow.js';
+import {
+    allocateBudgetToAgent,
+    completeAgentRequest,
+    completeTask,
+    cancelTask,
+    getServerAddress,
+    createTaskForClient,
+} from './apis/escrow.js';
+import { runAgent } from './apis/agents.js';
 
 dotenv.config();
 
@@ -109,6 +117,26 @@ app.post('/api/escrow/cancel-task', async (req, res) => {
         res.json(result);
     } catch (error) {
         res.status(500).json({ error: error.message });
+    }
+});
+
+// Agent execution API - runs real OpenRouter-backed agents
+app.post('/api/agents/run', async (req, res) => {
+    try {
+        const { agentType, input, options } = req.body || {};
+
+        if (!agentType || !input) {
+            return res.status(400).json({ error: 'Missing required fields: agentType, input' });
+        }
+
+        const result = await runAgent(agentType, input, options || {});
+        if (!result.success) {
+            return res.status(500).json(result);
+        }
+
+        res.json(result);
+    } catch (error) {
+        res.status(500).json({ error: error.message || 'Agent execution failed' });
     }
 });
 
