@@ -5,7 +5,7 @@ class ResearchAgent {
         this.agentId = 2; // On-chain agent ID
         this.model = "deepseek/deepseek-r1-0528:free"; // 1M context for research
         // Prefer dedicated key, fall back to shared key if needed
-        this.apiKey = process.env.Research_API_KEY || process.env.RESEARCH_API_KEY || process.env.OPENROUTER_API_KEY;
+        this.apiKey = process.env.OPENROUTER_API_KEY;
         this.baseURL = 'https://openrouter.ai/api/v1';
         
         this.client = axios.create({

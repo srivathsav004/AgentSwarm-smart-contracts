@@ -5,7 +5,7 @@ class ContentAgent {
         this.agentId = 4; // On-chain agent ID
         this.model = "mistralai/mistral-small-3.1-24b-instruct:free"; // 400B MoE, great for creativity
         // Prefer dedicated key, fall back to shared key if needed
-        this.apiKey = process.env.Content_API_KEY || process.env.CONTENT_API_KEY || process.env.OPENROUTER_API_KEY;
+        this.apiKey = process.env.OPENROUTER_API_KEY1;
         this.baseURL = 'https://openrouter.ai/api/v1';
         
         this.client = axios.create({

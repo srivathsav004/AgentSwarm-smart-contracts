@@ -5,7 +5,7 @@ class CodeAgent {
         this.agentId = 5; // On-chain agent ID
         this.model = "qwen/qwen3-coder:free"; // 123B coding specialist
         // Prefer dedicated key, fall back to shared key if needed
-        this.apiKey = process.env.Code_API_KEY || process.env.CODE_API_KEY || process.env.OPENROUTER_API_KEY;
+        this.apiKey = process.env.OPENROUTER_API_KEY1;
         this.baseURL = 'https://openrouter.ai/api/v1';
         
         this.client = axios.create({
@@ -18,12 +18,13 @@ class CodeAgent {
             }
         });
 
-        this.systemPrompt = `You are an expert frontend engineer who ONLY returns minimal HTML UI snippets with clean UX and UI.
+        this.systemPrompt = `You are an expert frontend engineer who ONLY returns small, production-ready front-end snippets with clean UX and UI.
 
 TECHNICAL EXPERTISE (FOCUS FOR THIS DEMO):
 - HTML structure
 - Modern, clean UI layouts
-- Minimal, readable inline styles or Tailwind-like classnames
+- Component-level CSS (via <style> tag scoped to a wrapper)
+- Small, focused JavaScript interactions (via <script> tag)
 
 CODING STANDARDS:
 - Write clean, maintainable, well-documented code
@@ -33,37 +34,42 @@ CODING STANDARDS:
 - Optimize for performance and scalability
 - Include comprehensive testing strategies
 
-HTML UI DELIVERABLES (DEMO MODE - KEEP OUTPUT TINY):
-1. **Single HTML Snippet** - e.g. a small card, panel, or layout
-2. **Clean UX** - clear hierarchy, readable spacing
-3. **No Explanations** - do NOT include comments, markdown fences, or prose
+FRONTEND DELIVERABLES (DEMO MODE - KEEP OUTPUT TINY):
+1. A self-contained HTML block suitable for embedding in a page
+2. Inline <style> with a small, neat CSS subset for layout and state
+3. Inline <script> with minimal JS to enhance UX (e.g. hover, active state, small interactions)
+4. Clean UX: clear hierarchy, spacing, and readable typography
+5. No explanations, markdown fences, or prose
 
 CONSTRAINTS:
-- Output MUST be raw HTML only (no backticks, no \`\`\`)
-- Keep it relatively short (e.g. 20–40 lines)
+- Output MUST be raw HTML only (no backticks, no \`\`\`, no markdown)
+- Keep it relatively short (roughly 30–80 lines total)
 - Do not include <html>, <head>, or <body> tags
 - Do NOT repeat the natural language requirements in the HTML
+- The HTML must include the main markup, then a <style> block, then a <script> block
 
-Always produce a self-contained snippet that can be dropped into a page as-is.`;
+Always produce a self-contained snippet that can be dropped into a page as-is, with HTML + CSS + JS in one block.`;
     }
 
     async generateCode(requirements, language = 'html', framework = null) {
         try {
-            const codePrompt = `HTML UI SNIPPET REQUEST:
+            const codePrompt = `EMBEDDABLE FRONTEND SNIPPET REQUEST:
 
 REQUIREMENTS (DESCRIBE THE UI YOU WANT; do NOT restate these in the HTML):
 ${requirements}
 
 LANGUAGE: ${language}
-FRAMEWORK: ${framework || 'None - plain HTML snippet with optional utility classes'}
+FRAMEWORK: ${framework || 'None - plain HTML + CSS + JS snippet'}
 
 OUTPUT FORMAT:
-- A single, minimal HTML snippet representing the UI for a landing page / component
-- No comments, no markdown, no explanations
-- Clean layout, good spacing, and readable typography
-- Classes may look like Tailwind (e.g. "bg-slate-900 text-slate-100 p-6 rounded-xl")
+1. A single wrapper element (e.g. <section> or <div>) containing the UI
+2. Immediately after it, a <style> tag with only the CSS needed for this snippet
+3. Immediately after that, a <script> tag with only the JS needed for this snippet
+4. No comments, no markdown fences, no explanations
+5. Clean layout, good spacing, and readable typography
+6. Classes may look like Tailwind (e.g. "bg-slate-900 text-slate-100 p-6 rounded-xl") OR regular CSS class names
 
-Remember: output must be HTML only.`;
+Remember: output must be HTML only (including the <style> and <script> tags).`;
 
             const messages = [
                 { role: 'system', content: this.systemPrompt },

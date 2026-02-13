@@ -5,7 +5,7 @@ class AnalystAgent {
         this.agentId = 3; // On-chain agent ID
         this.model = "nvidia/nemotron-nano-9b-v2:free"; // Great for analytical reasoning
         // Prefer dedicated key, fall back to shared key if needed
-        this.apiKey = process.env.Analyst_API_KEY || process.env.ANALYST_API_KEY || process.env.OPENROUTER_API_KEY;
+        this.apiKey = process.env.OPENROUTER_API_KEY;
         this.baseURL = 'https://openrouter.ai/api/v1';
         
         this.client = axios.create({

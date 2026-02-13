@@ -195,7 +195,9 @@ export async function runAgent(agentType, input, options = {}) {
                     'html',
                     options.framework || 'plain-html-snippet'
                 );
-                if (!result.success) {
+                // If the underlying agent call failed OR returned an empty/whitespace-only response,
+                // fall back to a static, known-good HTML snippet so the UI always has something to render.
+                if (!result.success || !result.response || !result.response.trim()) {
                     const fallback = buildFallbackOutput('code', input);
                     return {
                         success: true,
@@ -203,15 +205,20 @@ export async function runAgent(agentType, input, options = {}) {
                         agentId: codeAgent.agentId,
                         model: result.model || 'fallback',
                         output: fallback,
-                        raw: result,
+                        raw: {
+                            ...result,
+                            usedFallback: true,
+                        },
                     };
                 }
+
+                const output = result.response;
                 return {
                     success: true,
                     agentType: 'Code',
                     agentId: result.agentId,
                     model: result.model,
-                    output: result.response,
+                    output,
                     raw: result,
                 };
             }
