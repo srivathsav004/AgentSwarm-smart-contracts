@@ -1,7 +1,7 @@
 import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
-import { allocateBudgetToAgent, completeAgentRequest, completeTask, cancelTask, getServerAddress } from './apis/escrow.js';
+import { allocateBudgetToAgent, completeAgentRequest, completeTask, cancelTask, getServerAddress, createTaskForClient } from './apis/escrow.js';
 
 dotenv.config();
 
@@ -29,6 +29,28 @@ app.get('/api/server', async (req, res) => {
 // Escrow APIs - x402 payment processing only
 // Note: Balances, agents, tasks, and task creation are now handled directly from blockchain by the client
 // These endpoints are used by the server to handle allocations after task creation
+
+// Create task for a client using their deposited funds
+app.post('/api/escrow/create-task', async (req, res) => {
+    try {
+        const { client, coordinatorAgentId, totalBudget, taskHash } = req.body;
+
+        if (!client || !coordinatorAgentId || !totalBudget) {
+            return res.status(400).json({ error: 'Missing required fields: client, coordinatorAgentId, totalBudget' });
+        }
+
+        const result = await createTaskForClient(
+            client,
+            Number(coordinatorAgentId),
+            BigInt(totalBudget),
+            taskHash || 'ipfs://TaskWorkflow'
+        );
+
+        res.json(result);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
 
 app.post('/api/escrow/allocate', async (req, res) => {
     try {

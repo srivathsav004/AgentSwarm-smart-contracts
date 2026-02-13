@@ -10,7 +10,7 @@ dotenv.config({ path: join(__dirname, '../.env') });
 const RPC_URL = process.env.SKALE_RPC_URL;
 const PRIVATE_KEY = process.env.SKALE_PRIVATE_KEY;
 const AGENT_TOKEN = process.env.AGENT_TOKEN_ADDRESS || "0xEC307d7ae333C32b70889F0Fd61ce6f02Ee31Cf8";
-const TASK_ESCROW = process.env.TASK_ESCROW_ADDRESS || "0x7448471429d6b31A25809deffB1C6e4Ea209C4F6";
+const TASK_ESCROW = process.env.TASK_ESCROW_ADDRESS || "0x167395Fba49094c4Dde9696849457474A54E361D";
 const AGENT_REGISTRY = process.env.AGENT_REGISTRY_ADDRESS || "0x5dB6615Be918c7d12c1342C7580BeA4a7726d6b1";
 
 const provider = new ethers.JsonRpcProvider(RPC_URL);
@@ -18,6 +18,7 @@ const serverWallet = new ethers.Wallet(PRIVATE_KEY, provider);
 
 const taskEscrowAbi = [
     "function createTaskWithBudget(uint256 coordinatorAgentId, uint256 totalBudget, string taskHash) returns (uint256)",
+    "function createTaskFromDeposit(address client, uint256 coordinatorAgentId, uint256 totalBudget, string taskHash) returns (uint256)",
     "function allocateBudgetToAgent(uint256 taskId, uint256 toAgentId, uint256 amount) returns (uint256)",
     "function completeAgentRequest(uint256 requestId, bool success)",
     "function completeTask(uint256 taskId, bool success)",
@@ -78,6 +79,36 @@ export async function createTaskWithBudget(userPrivateKey, coordinatorAgentId, t
         } catch {}
     }
     
+    return {
+        success: true,
+        taskId,
+        txHash: receipt.hash,
+        gasUsed: receipt.gasUsed.toString()
+    };
+}
+
+// Create a task on behalf of a client using their pre-deposited funds.
+// This uses the server wallet (contract owner) and DOES NOT require the user's private key.
+export async function createTaskForClient(clientAddress, coordinatorAgentId, totalBudget, taskHash = "ipfs://TaskWorkflow") {
+    const tx = await escrowContract.createTaskFromDeposit(
+        clientAddress,
+        BigInt(coordinatorAgentId),
+        BigInt(totalBudget),
+        taskHash
+    );
+    const receipt = await tx.wait();
+
+    let taskId = null;
+    for (const log of receipt.logs) {
+        try {
+            const parsed = escrowContract.interface.parseLog(log);
+            if (parsed && parsed.name === 'TaskCreated') {
+                taskId = parsed.args[0].toString();
+                break;
+            }
+        } catch {}
+    }
+
     return {
         success: true,
         taskId,

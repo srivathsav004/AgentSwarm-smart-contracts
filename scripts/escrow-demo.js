@@ -35,7 +35,7 @@ async function main() {
     // Auto-updated after latest deployment
     const AGENT_REGISTRY = "0x5dB6615Be918c7d12c1342C7580BeA4a7726d6b1";
     const AGENT_TOKEN = "0xEC307d7ae333C32b70889F0Fd61ce6f02Ee31Cf8";
-    const TASK_ESCROW = "0x7448471429d6b31A25809deffB1C6e4Ea209C4F6";
+    const TASK_ESCROW = "0x167395Fba49094c4Dde9696849457474A54E361D";
 
     const registryArtifact = await hre.artifacts.readArtifact('AgentRegistry');
     const tokenArtifact = await hre.artifacts.readArtifact('AgentToken');
