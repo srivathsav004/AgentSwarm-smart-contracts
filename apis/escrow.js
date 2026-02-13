@@ -172,35 +172,56 @@ Result: Optimized and enhanced output for next stage.`;
 }
 
 export async function allocateBudgetToAgent(taskId, toAgentId, amount, agentInput = '') {
-    const tx = await escrowContract.allocateBudgetToAgent(
-        BigInt(taskId),
-        BigInt(toAgentId),
-        amount
-    );
-    const receipt = await tx.wait();
-    
-    let requestId = null;
-    let agentType = null;
-    
-    for (const log of receipt.logs) {
+    const taskIdBn = BigInt(taskId);
+    const toAgentIdBn = BigInt(toAgentId);
+    const amountBn = typeof amount === 'bigint' ? amount : BigInt(amount);
+
+    // Simple retry logic to mitigate transient RPC "socket hang up" errors
+    let lastError = null;
+    for (let attempt = 0; attempt < 3; attempt++) {
         try {
-            const parsed = escrowContract.interface.parseLog(log);
-            if (parsed && parsed.name === 'AgentRequestCreated') {
-                requestId = parsed.args[0].toString();
-                // Determine agent type from agentId (you may need to fetch from registry)
-                break;
+            const tx = await escrowContract.allocateBudgetToAgent(
+                taskIdBn,
+                toAgentIdBn,
+                amountBn
+            );
+            const receipt = await tx.wait();
+            
+            let requestId = null;
+            let agentType = null;
+            
+            for (const log of receipt.logs) {
+                try {
+                    const parsed = escrowContract.interface.parseLog(log);
+                    if (parsed && parsed.name === 'AgentRequestCreated') {
+                        requestId = parsed.args[0].toString();
+                        // Determine agent type from agentId (you may need to fetch from registry)
+                        break;
+                    }
+                } catch {}
             }
-        } catch {}
+            
+            return {
+                success: true,
+                requestId,
+                txHash: receipt.hash,
+                gasUsed: receipt.gasUsed.toString(),
+                input: agentInput,  // Echo back the input
+                agentId: toAgentId
+            };
+        } catch (error) {
+            lastError = error;
+            // Only retry on low-level transport issues
+            const msg = (error && error.message) ? error.message : '';
+            const isSocketError = msg.includes('socket hang up') || msg.includes('ECONNRESET');
+            if (!isSocketError || attempt === 2) {
+                throw error;
+            }
+        }
     }
-    
-    return {
-        success: true,
-        requestId,
-        txHash: receipt.hash,
-        gasUsed: receipt.gasUsed.toString(),
-        input: agentInput,  // Echo back the input
-        agentId: toAgentId
-    };
+
+    // Should be unreachable, but TypeScript/linters may complain without this.
+    throw lastError || new Error('allocateBudgetToAgent failed after retries');
 }
 
 export async function completeAgentRequest(requestId, success, agentType = '') {
