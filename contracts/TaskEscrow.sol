@@ -164,7 +164,7 @@ contract TaskEscrow is ReentrancyGuard {
     // MAIN FUNCTIONS (defined first so legacy functions can call them)
     // ═══════════════════════════════════════════════════════════════════════════════════════
     
-    // User creates a task with total budget
+    // User creates a task with total budget (direct-from-wallet flow)
     function createTaskWithBudget(
         uint256 coordinatorAgentId,
         uint256 totalBudget,
@@ -187,25 +187,58 @@ contract TaskEscrow is ReentrancyGuard {
             require(agentToken.transferFrom(msg.sender, address(this), fromWallet), "Transfer failed");
         }
         
+        return _createTaskInternal(msg.sender, coordinatorAgentId, totalBudget, coordinator.pricePerTask);
+    }
+
+    // Server/owner creates a task using a client's pre-deposited funds.
+    // This is used by the x402 server wallet so the user only needs to
+    // approve + deposit once; all subsequent task creation gas is paid
+    // by the server wallet.
+    function createTaskFromDeposit(
+        address client,
+        uint256 coordinatorAgentId,
+        uint256 totalBudget,
+        string memory /* taskHash */ // kept for legacy compatibility, ignored on-chain
+    ) external onlyOwner nonReentrant returns (uint256) {
+        IAgentRegistry.Agent memory coordinator = registry.getAgent(coordinatorAgentId);
+        require(coordinator.active, "Coordinator not active");
+        require(coordinator.agentType == 0, "Must be coordinator agent");
+        require(totalBudget >= coordinator.pricePerTask, "Budget too low for coordinator");
+        require(userDeposits[client] >= totalBudget, "Insufficient deposit");
+
+        // Funds are already held by this contract from previous deposits.
+        // Just deduct from the user's deposit accounting and create the task.
+        userDeposits[client] -= totalBudget;
+
+        return _createTaskInternal(client, coordinatorAgentId, totalBudget, coordinator.pricePerTask);
+    }
+
+    // Internal helper shared by both creation flows
+    function _createTaskInternal(
+        address client,
+        uint256 coordinatorAgentId,
+        uint256 totalBudget,
+        uint256 coordinatorFee
+    ) internal returns (uint256) {
         uint256 taskId = nextTaskId++;
         
         tasks[taskId] = Task({
             id: taskId,
-            client: msg.sender,
+            client: client,
             coordinatorAgentId: coordinatorAgentId,
             totalBudget: totalBudget,
-            remainingBudget: totalBudget - coordinator.pricePerTask, // Reserve coordinator fee
+            remainingBudget: totalBudget - coordinatorFee, // Reserve coordinator fee
             pendingAllocations: 0,
-            coordinatorFee: coordinator.pricePerTask,
+            coordinatorFee: coordinatorFee,
             status: TaskStatus.InProgress,
             createdAt: block.timestamp,
             deadline: block.timestamp + TASK_TIMEOUT
         });
         
-        clientTasks[msg.sender].push(taskId);
+        clientTasks[client].push(taskId);
         agentTasks[coordinatorAgentId].push(taskId);
         
-        emit TaskCreated(taskId, msg.sender, totalBudget, coordinator.pricePerTask);
+        emit TaskCreated(taskId, client, totalBudget, coordinatorFee);
         return taskId;
     }
 
