@@ -10,7 +10,7 @@ dotenv.config({ path: join(__dirname, '../.env') });
 const RPC_URL = process.env.SKALE_RPC_URL;
 const PRIVATE_KEY = process.env.SKALE_PRIVATE_KEY;
 const AGENT_TOKEN = process.env.AGENT_TOKEN_ADDRESS || "0xEC307d7ae333C32b70889F0Fd61ce6f02Ee31Cf8";
-const TASK_ESCROW = process.env.TASK_ESCROW_ADDRESS || "0x29B8dB70779839AdD01c87bEC59475aBB8e94E62";
+const TASK_ESCROW = process.env.TASK_ESCROW_ADDRESS || "0x7448471429d6b31A25809deffB1C6e4Ea209C4F6";
 const AGENT_REGISTRY = process.env.AGENT_REGISTRY_ADDRESS || "0x5dB6615Be918c7d12c1342C7580BeA4a7726d6b1";
 
 const provider = new ethers.JsonRpcProvider(RPC_URL);

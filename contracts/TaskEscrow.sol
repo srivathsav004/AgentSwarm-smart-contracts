@@ -58,6 +58,7 @@ contract TaskEscrow is ReentrancyGuard {
     mapping(uint256 => uint256[]) public taskRequests; // taskId -> requestIds
     mapping(address => uint256[]) public clientTasks;
     mapping(uint256 => uint256[]) public agentTasks;
+    mapping(address => uint256) public userDeposits; // Track user deposits to escrow
     
     uint256 public nextTaskId = 1;
     uint256 public nextRequestId = 1;
@@ -73,6 +74,8 @@ contract TaskEscrow is ReentrancyGuard {
     event PaymentReleased(uint256 indexed taskId, address indexed recipient, uint256 amount);
     event BudgetAllocated(uint256 indexed taskId, uint256 amount, string purpose);
     event OwnershipTransferred(address indexed previousOwner, address indexed newOwner);
+    event Deposit(address indexed user, uint256 amount);
+    event Withdraw(address indexed user, uint256 amount);
     
     modifier onlyOwner() {
         require(msg.sender == owner, "Not owner");
@@ -133,6 +136,31 @@ contract TaskEscrow is ReentrancyGuard {
     }
     
     // ═══════════════════════════════════════════════════════════════════════════════════════
+    // DEPOSIT FUNCTIONS
+    // ═══════════════════════════════════════════════════════════════════════════════════════
+    
+    // User deposits tokens to escrow (pre-deposit for future tasks)
+    function deposit(uint256 amount) external nonReentrant {
+        require(amount > 0, "Amount must be > 0");
+        require(agentToken.transferFrom(msg.sender, address(this), amount), "Transfer failed");
+        userDeposits[msg.sender] += amount;
+        emit Deposit(msg.sender, amount);
+    }
+    
+    // User withdraws unused deposited tokens
+    function withdrawDeposit(uint256 amount) external nonReentrant {
+        require(userDeposits[msg.sender] >= amount, "Insufficient deposit");
+        userDeposits[msg.sender] -= amount;
+        require(agentToken.transfer(msg.sender, amount), "Transfer failed");
+        emit Withdraw(msg.sender, amount);
+    }
+    
+    // Get user's deposit balance
+    function getUserDeposit(address user) external view returns (uint256) {
+        return userDeposits[user];
+    }
+    
+    // ═══════════════════════════════════════════════════════════════════════════════════════
     // MAIN FUNCTIONS (defined first so legacy functions can call them)
     // ═══════════════════════════════════════════════════════════════════════════════════════
     
@@ -147,8 +175,17 @@ contract TaskEscrow is ReentrancyGuard {
         require(coordinator.agentType == 0, "Must be coordinator agent");
         require(totalBudget >= coordinator.pricePerTask, "Budget too low for coordinator");
         
-        // Transfer total budget to escrow
-        require(agentToken.transferFrom(msg.sender, address(this), totalBudget), "Transfer failed");
+        // Use deposited tokens first, then pull from wallet if needed
+        uint256 fromDeposit = userDeposits[msg.sender] >= totalBudget ? totalBudget : userDeposits[msg.sender];
+        uint256 fromWallet = totalBudget - fromDeposit;
+        
+        if (fromDeposit > 0) {
+            userDeposits[msg.sender] -= fromDeposit;
+        }
+        
+        if (fromWallet > 0) {
+            require(agentToken.transferFrom(msg.sender, address(this), fromWallet), "Transfer failed");
+        }
         
         uint256 taskId = nextTaskId++;
         
@@ -348,5 +385,10 @@ contract TaskEscrow is ReentrancyGuard {
     
     function getAgentRequest(uint256 requestId) external view returns (AgentRequest memory) {
         return agentRequests[requestId];
+    }
+    
+    // Get user's total deposit balance
+    function getUserDepositBalance(address user) external view returns (uint256) {
+        return userDeposits[user];
     }
 }
